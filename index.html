@@ -6,9 +6,11 @@
 </head>
 <body>
   <script>
-    const loginHint = new URLSearchParams(window.location.search).get("login_hint");
-    const forwardTo = `/mirror${loginHint ? "?login_hint=" + encodeURIComponent(loginHint) : ""}`;
+    // Construct the forwardTo URL with all query parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const forwardTo = `/mirror?${urlParams.toString()}`;
 
+    // Fetch content from the /mirror endpoint
     fetch(forwardTo)
       .then(res => res.text())
       .then(html => {
