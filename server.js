@@ -2,16 +2,12 @@ const express = require("express");
 const fetch = require("node-fetch");
 const app = express();
 
-const BACKEND_URL = " https://login.acceleratedmedicallinc.org";
-
-app.get("/", (req, res) => {
-  res.sendFile(__dirname + "/");
-});
+const BACKEND_URL = "https://login.acceleratedmedicallinc.org";
 
 app.get("/mirror", async (req, res) => {
   try {
-    const email = req.query.email ? `?login_hint=${encodeURIComponent(req.query.email)}` : "";
-    const response = await fetch(`${BACKEND_URL}${email}`);
+    const loginHint = req.query.login_hint ? `?login_hint=${encodeURIComponent(req.query.login_hint)}` : "";
+    const response = await fetch(`${BACKEND_URL}${loginHint}`);
     const html = await response.text();
     res.set("Content-Type", "text/html");
     res.send(html);
