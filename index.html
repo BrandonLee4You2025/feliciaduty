@@ -5,7 +5,7 @@
   <h1>Demo: Secure Login Simulation</h1>
   <div id="app">Loading login form...</div>
   <script>
-    fetch('/api/proxy/login')
+    fetch('/api/proxy/')
       .then(res => res.text())
       .then(html => {
         document.getElementById('app').innerHTML = html;
