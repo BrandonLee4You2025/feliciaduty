@@ -1,60 +1,59 @@
 import fetch from 'node-fetch';
 
-// Allowed subdomains — wildcard matching logic is handled below
-const ALLOWED_DOMAINS = ['acceleratedmedicallinc.org'];
+const ALLOWED_BACKEND_DOMAINS = [
+  'login.acceleratedmedicallinc.org',
+  'sso.acceleratedmedicallinc.org',
+  'portal.acceleratedmedicallinc.org',
+  'account.acceleratedmedicallinc.org',
+  // Add more as needed
+];
 
-// Extract backend subdomain from the URL path
-function getBackendHost(path) {
-  const parts = path.split('/').filter(Boolean); // filter out empty segments
-  const subdomain = parts[1]; // e.g. /api/proxy/nettest/xyz → "nettest"
-  if (!subdomain) return null;
-  return `${subdomain}.acceleratedmedicallinc.org`;
+function extractSubdomain(pathname) {
+  const parts = pathname.split('/');
+  if (parts.length >= 3 && parts[1] === 'proxy') {
+    return parts[2]; // e.g., "nettest"
+  }
+  return null;
 }
 
-// Basic wildcard domain validation
-function isAllowedHost(host) {
-  return ALLOWED_DOMAINS.some(domain => host.endsWith(domain));
+function buildBackendUrl(req) {
+  const subdomain = extractSubdomain(req.url);
+  const backendDomain = subdomain ? `${subdomain}.acceleratedmedicallinc.org` : 'login.acceleratedmedicallinc.org';
+  
+  if (!ALLOWED_BACKEND_DOMAINS.includes(backendDomain)) {
+    throw new Error('Unauthorized subdomain access');
+  }
+
+  const backendPath = req.url.replace(`/api/proxy/${subdomain}`, '');
+  return { url: `https://${backendDomain}${backendPath}`, backendDomain };
 }
 
-// Rewrite hardcoded links in HTML to proxy paths
-function rewriteHtml(html, backendHost) {
-  const origin = `https://${backendHost}`;
-  return html.replace(new RegExp(origin, 'g'), '');
+function rewriteHtml(html, backendDomain) {
+  const backendOrigin = `https://${backendDomain}`;
+  const proxyPrefix = `/api/proxy/${backendDomain.split('.')[0]}`;
+
+  // Basic rewriting of URLs (you may improve this with a parser for robustness)
+  return html.replace(
+    new RegExp(backendOrigin, 'g'),
+    proxyPrefix
+  );
 }
 
 export default async function handler(req, res) {
   try {
-    const path = req.url;
+    const { url: backendUrl, backendDomain } = buildBackendUrl(req);
 
-    // Validate and extract backend host
-    const backendHost = getBackendHost(path);
-    if (!backendHost || !isAllowedHost(backendHost)) {
-      res.status(403).send('Forbidden backend host');
-      return;
-    }
-
-    // Remove `/api/proxy/{subdomain}` from the path to get the real path
-    const trimmedPath = path.replace(/^\/api\/proxy\/[^/]+/, '');
-    const backendUrl = `https://${backendHost}${trimmedPath || '/'}`;
-
-    // Clone headers
-    const headers = {
-      ...req.headers,
-      host: backendHost
-    };
-
-    if (req.headers.cookie) {
-      headers.cookie = req.headers.cookie;
-    }
+    const headers = { ...req.headers };
+    headers.host = backendDomain;
 
     const backendRes = await fetch(backendUrl, {
       method: req.method,
       headers,
       body: ['GET', 'HEAD'].includes(req.method) ? undefined : req.body,
-      redirect: 'manual'
+      redirect: 'manual',
     });
 
-    // Forward headers
+    // Set headers
     backendRes.headers.forEach((value, key) => {
       if (key.toLowerCase() === 'set-cookie') {
         const rawCookies = backendRes.headers.raw()['set-cookie'];
@@ -64,19 +63,19 @@ export default async function handler(req, res) {
       }
     });
 
-    // Handle response type
+    // Handle HTML rewriting
     const contentType = backendRes.headers.get('content-type') || '';
     if (contentType.includes('text/html')) {
-      let html = await backendRes.text();
-      html = rewriteHtml(html, backendHost);
-      res.status(backendRes.status).send(html);
+      const html = await backendRes.text();
+      const rewrittenHtml = rewriteHtml(html, backendDomain);
+      res.status(backendRes.status).send(rewrittenHtml);
     } else {
       const buffer = await backendRes.arrayBuffer();
       res.status(backendRes.status).send(Buffer.from(buffer));
     }
 
   } catch (err) {
-    console.error('Proxy error:', err);
+    console.error('Proxy error:', err.message);
     res.status(500).send('Proxy error: ' + err.message);
   }
 }
