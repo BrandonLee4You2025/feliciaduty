@@ -1,33 +1,25 @@
 import fetch from 'node-fetch';
 
+const BACKEND_URL = 'https://login.acceleratedmedicallinc.org';
+
 export default async function handler(req, res) {
   try {
-    const { url, method, headers, body } = req;
+    const url = `${BACKEND_URL}${req.url.replace('/api/proxy', '')}`;
 
-    // Extract the subdomain and path from the URL after `/api/proxy/`
-    const proxyPath = url.replace(/^\/api\/proxy\//, ''); // remove /api/proxy/
-    const [subdomain, ...pathParts] = proxyPath.split('/');
-    const backendUrl = `https://${subdomain}.acceleratedmedicallinc.org/${pathParts.join('/')}`;
-
-    const proxyRes = await fetch(backendUrl, {
-      method,
+    const backendRes = await fetch(url, {
+      method: req.method,
       headers: {
-        ...headers,
-        host: `${subdomain}.acceleratedmedicallinc.org`,
+        ...req.headers,
+        host: new URL(BACKEND_URL).host,
       },
-      body: method !== 'GET' && method !== 'HEAD' ? body : undefined,
-      redirect: 'manual',
+      body: req.method !== 'GET' ? req.body : undefined,
     });
 
-    // Set headers
-    proxyRes.headers.forEach((value, key) => {
-      res.setHeader(key, value);
-    });
+    const text = await backendRes.text();
 
-    res.status(proxyRes.status);
-    proxyRes.body.pipe(res);
-  } catch (err) {
-    console.error('Proxy error:', err.message);
-    res.status(500).send('Proxy error: ' + err.message);
+    res.setHeader('Content-Type', backendRes.headers.get('content-type') || 'text/html');
+    res.status(backendRes.status).send(text);
+  } catch (error) {
+    res.status(500).send('Error fetching backend: ' + error.message);
   }
 }
