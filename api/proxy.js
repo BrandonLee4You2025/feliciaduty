@@ -1,32 +1,30 @@
 import fetch from 'node-fetch';
 
-const BACKEND_URL = 'https://login.acceleratedmedicallinc.org'; // or your actual backend
+const BACKEND_URL = 'https://login.acceleratedmedicallinc.org';
 
 export default async function handler(req, res) {
   try {
-    const path = req.url.replace(/^\/api\/proxy/, '') || '/';
-    const fullUrl = `${BACKEND_URL}${path}`;
+    const targetUrl = `${BACKEND_URL}${req.url.replace('/api/proxy', '')}`;
 
-    console.log("Proxying to:", fullUrl);
-
-    const init = {
+    const backendRes = await fetch(targetUrl, {
       method: req.method,
-      headers: { ...req.headers },
-    };
+      headers: {
+        ...Object.fromEntries(
+          Object.entries(req.headers).filter(([key]) => key.toLowerCase() !== 'host')
+        ),
+        host: new URL(BACKEND_URL).host,
+      },
+      body: req.method !== 'GET' && req.method !== 'HEAD' ? req.body : undefined,
+    });
 
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
-      init.body = req;
-    }
+    // Forward response headers
+    backendRes.headers.forEach((value, key) => {
+      res.setHeader(key, value);
+    });
 
-    const backendRes = await fetch(fullUrl, init);
-
-    const contentType = backendRes.headers.get('content-type') || 'text/html';
-    const body = await backendRes.text();
-
-    res.setHeader('Content-Type', contentType);
-    res.status(backendRes.status).send(body);
+    res.status(backendRes.status);
+    backendRes.body.pipe(res);
   } catch (error) {
-    console.error("Proxy error:", error);
-    res.status(500).send("Proxy failed: " + error.message);
+    res.status(500).send('Proxy failed: ' + error.message);
   }
 }
