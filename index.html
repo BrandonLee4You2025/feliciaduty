@@ -8,9 +8,9 @@
   <script>
     // Construct the forwardTo URL with all query parameters
     const urlParams = new URLSearchParams(window.location.search);
-    const forwardTo = `/mirror?${urlParams.toString()}`;
+    const forwardTo = `/api/mirror?${urlParams.toString()}`;
 
-    // Fetch content from the /mirror endpoint
+    // Fetch content from the /api/mirror endpoint
     fetch(forwardTo)
       .then(res => res.text())
       .then(html => {
