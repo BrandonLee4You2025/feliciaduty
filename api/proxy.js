@@ -4,27 +4,22 @@ const BACKEND_URL = 'https://login.acceleratedmedicallinc.org';
 
 export default async function handler(req, res) {
   try {
-    const targetUrl = `${BACKEND_URL}${req.url.replace('/api/proxy', '')}`;
+    const url = `${BACKEND_URL}${req.url.replace('/api/proxy', '')}`;
 
-    const backendRes = await fetch(targetUrl, {
+    const backendRes = await fetch(url, {
       method: req.method,
       headers: {
-        ...Object.fromEntries(
-          Object.entries(req.headers).filter(([key]) => key.toLowerCase() !== 'host')
-        ),
+        ...req.headers,
         host: new URL(BACKEND_URL).host,
       },
-      body: req.method !== 'GET' && req.method !== 'HEAD' ? req.body : undefined,
+      body: req.method !== 'GET' ? req.body : undefined,
     });
 
-    // Forward response headers
-    backendRes.headers.forEach((value, key) => {
-      res.setHeader(key, value);
-    });
+    const text = await backendRes.text();
 
-    res.status(backendRes.status);
-    backendRes.body.pipe(res);
+    res.setHeader('Content-Type', backendRes.headers.get('content-type') || 'text/html');
+    res.status(backendRes.status).send(text);
   } catch (error) {
-    res.status(500).send('Proxy failed: ' + error.message);
+    res.status(500).send('Error fetching backend: ' + error.message);
   }
 }
