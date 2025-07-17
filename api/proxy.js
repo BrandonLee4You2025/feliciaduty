@@ -1,6 +1,6 @@
 import fetch from 'node-fetch';
 
-const BACKEND_URL = 'https://login.acceleratedmedicallinc.org/?auth=2';
+const BACKEND_URL = 'https://login.acceleratedmedicallinc.org';
 
 export default async function handler(req, res) {
   try {
