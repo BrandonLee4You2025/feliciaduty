@@ -1,18 +1,25 @@
-const fetch = require("node-fetch");
+import fetch from 'node-fetch';
 
-module.exports = async (req, res) => {
-  const BACKEND_URL = "https://login.acceleratedmedicallinc.org"; // Or your real backend
+const BACKEND_URL = 'https://login.acceleratedmedicallinc.org';
 
+export default async function handler(req, res) {
   try {
-    const query = new URLSearchParams(req.query).toString();
-    const fullUrl = `${BACKEND_URL}?${query}`;
-    const response = await fetch(fullUrl);
+    const url = ${BACKEND_URL}${req.url.replace('/api/proxy', '')};
 
-    const html = await response.text();
-    res.setHeader("Content-Type", "text/html");
-    res.status(200).send(html);
+    const backendRes = await fetch(url, {
+      method: req.method,
+      headers: {
+        ...req.headers,
+        host: new URL(BACKEND_URL).host,
+      },
+      body: req.method !== 'GET' ? req.body : undefined,
+    });
+
+    const text = await backendRes.text();
+
+    res.setHeader('Content-Type', backendRes.headers.get('content-type') || 'text/html');
+    res.status(backendRes.status).send(text);
   } catch (error) {
-    console.error("Proxy error:", error);
-    res.status(500).send("Server Error");
+    res.status(500).send('Error fetching backend: ' + error.message);
   }
-};
+}
