@@ -1,8 +1,0 @@
-{
-  "name": "secure-portal",
-  "version": "1.0.0",
-  "description": "Safe-looking proxy frontend",
-  "dependencies": {
-    "node-fetch": "^2.6.7"
-  }
-}
