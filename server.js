@@ -6,9 +6,19 @@ const BACKEND_URL = "https://login.acceleratedmedicallinc.org";
 
 app.get("/mirror", async (req, res) => {
   try {
-    const loginHint = req.query.login_hint ? `?login_hint=${encodeURIComponent(req.query.login_hint)}` : "";
-    const response = await fetch(`${BACKEND_URL}${loginHint}`);
+    // Construct the query string from the request
+    const queryString = Object.keys(req.query)
+      .map(key => `${encodeURIComponent(key)}=${encodeURIComponent(req.query[key])}`)
+      .join('&');
+
+    // Append the query string to the backend URL
+    const fullUrl = `${BACKEND_URL}?${queryString}`;
+
+    // Fetch content from the backend
+    const response = await fetch(fullUrl);
     const html = await response.text();
+
+    // Set the content type and send the response
     res.set("Content-Type", "text/html");
     res.send(html);
   } catch (err) {
