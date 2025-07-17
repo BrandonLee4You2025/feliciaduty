@@ -12,7 +12,7 @@ app.get("/mirror", async (req, res) => {
       .join('&');
 
     // Append the query string to the backend URL
-    const fullUrl = `${BACKEND_URL}?${queryString}`;
+    const fullUrl = `${BACKEND_URL}${queryString ? '?' + queryString : ''}`;
 
     // Fetch content from the backend
     const response = await fetch(fullUrl);
