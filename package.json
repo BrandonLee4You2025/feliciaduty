@@ -1,0 +1,9 @@
+{
+  "name": "transconnectapp",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "dependencies": {
+    "node-fetch": "^2.6.7"
+  }
+}
