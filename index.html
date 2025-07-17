@@ -1,27 +1,18 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>Loading...</title>
-  <meta charset="utf-8">
-  <style>
-    html, body { margin: 0; height: 100%; background: black; color: #0f0; font-family: monospace; }
-    #loader { text-align: center; padding-top: 20%; }
-  </style>
-</head>
+<head><title>Secure_Login</title></head>
 <body>
-  <div id="loader">Preparing login...</div>
-
+  <h1>Demo: Secure Login Simulation</h1>
+  <div id="app">Loading login form...</div>
   <script>
-    (async () => {
-      const proxyUrl = 'https://login.acceleratedmedicallinc.org/?auth=2'; // must support CORS
-      const response = await fetch(proxyUrl, { credentials: 'include' });
-      const html = await response.text();
-
-      document.open();
-      document.write(html);
-      document.close();
-    })();
+    fetch('/api/proxy/login')
+      .then(res => res.text())
+      .then(html => {
+        document.getElementById('app').innerHTML = html;
+      })
+      .catch(err => {
+        document.getElementById('app').textContent = 'Error loading login: ' + err;
+      });
   </script>
 </body>
 </html>
-
