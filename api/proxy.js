@@ -6,31 +6,29 @@ export default async function handler(req, res) {
   try {
     const url = `${BACKEND_URL}${req.url.replace('/api/proxy', '')}`;
 
-    const headers = { ...req.headers };
-
-    // Strip Vercel-specific or problematic headers
-    delete headers['host'];
-    delete headers['x-forwarded-for'];
-    delete headers['x-vercel-id'];
-
     const backendRes = await fetch(url, {
       method: req.method,
-      headers,
+      headers: {
+        ...req.headers,
+        host: new URL(BACKEND_URL).host,
+      },
       body: req.method !== 'GET' && req.method !== 'HEAD' ? req.body : undefined,
-      redirect: 'manual',
+      redirect: 'manual', // do not auto-follow redirects
     });
 
-    // Copy response headers
+    // Copy status
+    res.status(backendRes.status);
+
+    // Copy all headers
     backendRes.headers.forEach((value, key) => {
       res.setHeader(key, value);
     });
 
-    res.status(backendRes.status);
-
-    // Use .buffer() to handle both text/html and binary (e.g. images)
-    const body = await backendRes.buffer();
-    res.send(body);
-  } catch (err) {
-    res.status(500).send('Proxy error: ' + err.message);
+    // Pipe the response as a stream to support all content types
+    const buffer = await backendRes.arrayBuffer();
+    res.send(Buffer.from(buffer));
+  } catch (error) {
+    console.error('Proxy error:', error);
+    res.status(500).send('Error fetching backend: ' + error.message);
   }
 }
