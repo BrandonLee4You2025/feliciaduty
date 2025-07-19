@@ -1,38 +1,32 @@
 import fetch from 'node-fetch';
 
-const BACKEND_URL = process.env.BACKEND_URL; // Use environment variable
+const BACKEND_URL = process.env.BACKEND_URL;
 
 export default async function handler(req, res) {
   try {
-    // Construct the full URL, preserving the original path and query parameters
-    const url = new URL(req.url, `https://${req.headers.host}`);
-    url.protocol = 'https:';
-    url.host = new URL(BACKEND_URL).host;
-    url.pathname = url.pathname.replace('/api/proxy', '');
+    // Extract the path after /api/proxy
+    const proxyPath = req.url.replace(/^\/api\/proxy/, '') || '/';
 
-    // Log the constructed URL for debugging
-    console.log('Proxied URL:', url.toString());
-
-    // Filter headers to forward only necessary ones
-    const headers = {
-      ...req.headers,
-      host: new URL(BACKEND_URL).host,
-    };
-    delete headers['content-length']; // Remove content-length to avoid issues with body parsing
+    // Reconstruct full backend URL
+    const url = new URL(proxyPath, BACKEND_URL);
+    url.search = req.url.includes('?') ? req.url.split('?')[1] : '';
 
     const backendRes = await fetch(url.toString(), {
       method: req.method,
-      headers: headers,
-      body: req.method !== 'GET' ? req.body : undefined,
+      headers: {
+        ...req.headers,
+        host: new URL(BACKEND_URL).host, // Overwrite host header
+      },
+      body: req.method !== 'GET' && req.method !== 'HEAD' ? req.body : undefined,
     });
 
-    const text = await backendRes.text();
+    const contentType = backendRes.headers.get('content-type') || 'text/plain';
+    const body = await backendRes.text();
 
-    // Set the Content-Type header based on the backend response
-    res.setHeader('Content-Type', backendRes.headers.get('content-type') || 'text/html');
-    res.status(backendRes.status).send(text);
+    res.setHeader('Content-Type', contentType);
+    res.status(backendRes.status).send(body);
   } catch (error) {
-    console.error('Error fetching backend:', error); // Log error for debugging
+    console.error('Error fetching backend:', error.message);
     res.status(500).send('Error fetching backend: ' + error.message);
   }
 }
