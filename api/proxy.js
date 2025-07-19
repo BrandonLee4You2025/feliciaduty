@@ -10,6 +10,9 @@ export default async function handler(req, res) {
     url.host = new URL(BACKEND_URL).host;
     url.pathname = url.pathname.replace('/api/proxy', '');
 
+    // Log the constructed URL for debugging
+    console.log('Proxied URL:', url.toString());
+
     const backendRes = await fetch(url.toString(), {
       method: req.method,
       headers: {
