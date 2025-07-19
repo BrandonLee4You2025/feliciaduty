@@ -1,50 +1,53 @@
 import fetch from 'node-fetch';
 
-const BASE_DOMAIN = 'acceleratedmedicallinc.org';
+const BACKEND_URL = 'https://login.acceleratedmedicallinc.org';
 
 export default async function handler(req, res) {
   try {
-    // Extract the host from the request URL
-    const host = req.headers.host;
+    // Remove "/api/proxy" and keep the subpath
+    const targetPath = req.url.replace(/^\/api\/proxy/, '') || '/';
+    const targetUrl = `${BACKEND_URL}${targetPath}`;
 
-    // Check if the host matches the base domain or any of its subdomains
-    if (host.includes(BASE_DOMAIN)) {
-      // Construct the backend URL
-      const backendUrl = `https://${host}${req.url}`;
+    const backendRes = await fetch(targetUrl, {
+      method: req.method,
+      headers: {
+        // Forward essential headers, strip host to avoid mismatch
+        ...Object.fromEntries(
+          Object.entries(req.headers).filter(([key]) => !['host', 'content-length'].includes(key))
+        ),
+        'x-forwarded-for': req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+        'x-forwarded-proto': req.headers['x-forwarded-proto'] || (req.socket.encrypted ? 'https' : 'http'),
+      },
+      body: req.method !== 'GET' && req.method !== 'HEAD' ? req.body : undefined,
+      redirect: 'manual',
+    });
 
-      console.log('Forwarding request to:', backendUrl);
-      console.log('Request Headers:', req.headers);
+    // Forward status and content headers
+    res.status(backendRes.status);
 
-      const backendRes = await fetch(backendUrl, {
-        method: req.method,
-        headers: {
-          ...req.headers,
-          host: host, // Forward the original host
-          'x-forwarded-for': req.headers['x-forwarded-for'] || req.socket.remoteAddress,
-          'x-forwarded-proto': req.headers['x-forwarded-proto'] || req.socket.encrypted ? 'https' : 'http',
-          'Cookie': req.headers.cookie, // Forward cookies
-        },
-        credentials: 'include', // Include credentials
-        body: req.method !== 'GET' ? req.body : undefined,
-      });
-
-      console.log('Response Status:', backendRes.status);
-      console.log('Response Headers:', backendRes.headers);
-
-      let text;
-      if (backendRes.headers.get('content-type')?.includes('application/json')) {
-        text = await backendRes.json();
+    // Forward all headers, including Set-Cookie
+    backendRes.headers.forEach((value, key) => {
+      if (key.toLowerCase() === 'set-cookie') {
+        // Multiple cookies need special handling on Vercel
+        const cookies = backendRes.headers.raw()['set-cookie'];
+        if (cookies) res.setHeader('Set-Cookie', cookies);
       } else {
-        text = await backendRes.text();
+        res.setHeader(key, value);
       }
+    });
 
-      res.setHeader('Content-Type', backendRes.headers.get('content-type') || 'text/html');
-      res.status(backendRes.status).send(text);
+    // Pipe the response body
+    const contentType = backendRes.headers.get('content-type') || '';
+    if (contentType.includes('application/json')) {
+      const json = await backendRes.json();
+      res.json(json);
     } else {
-      res.status(404).send('Not Found');
+      const text = await backendRes.text();
+      res.send(text);
     }
-  } catch (error) {
-    console.error('Error fetching backend:', error);
-    res.status(500).send('Error fetching backend: ' + error.message);
+
+  } catch (err) {
+    console.error('Proxy error:', err.message);
+    res.status(500).send(`Proxy error: ${err.message}`);
   }
 }
