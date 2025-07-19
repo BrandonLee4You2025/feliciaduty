@@ -13,17 +13,22 @@ export default async function handler(req, res) {
     // Log the constructed URL for debugging
     console.log('Proxied URL:', url.toString());
 
+    // Filter headers to forward only necessary ones
+    const headers = {
+      ...req.headers,
+      host: new URL(BACKEND_URL).host,
+    };
+    delete headers['content-length']; // Remove content-length to avoid issues with body parsing
+
     const backendRes = await fetch(url.toString(), {
       method: req.method,
-      headers: {
-        ...req.headers,
-        host: new URL(BACKEND_URL).host,
-      },
+      headers: headers,
       body: req.method !== 'GET' ? req.body : undefined,
     });
 
     const text = await backendRes.text();
 
+    // Set the Content-Type header based on the backend response
     res.setHeader('Content-Type', backendRes.headers.get('content-type') || 'text/html');
     res.status(backendRes.status).send(text);
   } catch (error) {
