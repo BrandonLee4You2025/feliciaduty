@@ -8,22 +8,32 @@ export default async function handler(req, res) {
   const BACKEND_URLS = [
     'https://login.acceleratedmedicallinc.org',
     'https://account.acceleratedmedicallinc.org',
-	'https://portal.acceleratedmedicallinc.org',
-	'https://www.acceleratedmedicallinc.org',
-	'https://sso.acceleratedmedicallinc.org',
+    'https://portal.acceleratedmedicallinc.org',
+    'https://www.acceleratedmedicallinc.org',
+    'https://sso.acceleratedmedicallinc.org',
   ];
 
   for (const base of BACKEND_URLS) {
     const fullUrl = `${base}${fullPath}`;
     try {
+      console.log(`Forwarding request to: ${fullUrl}`);
+      console.log('Request Headers:', req.headers);
+
       const backendRes = await fetch(fullUrl, {
         method: req.method,
         headers: {
           ...req.headers,
           host: new URL(base).host,
+          'x-forwarded-for': req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+          'x-forwarded-proto': req.headers['x-forwarded-proto'] || req.socket.encrypted ? 'https' : 'http',
+          'Cookie': req.headers.cookie, // Forward cookies
         },
+        credentials: 'include', // Include credentials
         body: req.method !== 'GET' ? req.body : undefined,
       });
+
+      console.log('Response Status:', backendRes.status);
+      console.log('Response Headers:', backendRes.headers);
 
       if (backendRes.status === 404) continue;
 
