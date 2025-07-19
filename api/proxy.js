@@ -4,9 +4,13 @@ const BACKEND_URL = process.env.BACKEND_URL; // Use environment variable
 
 export default async function handler(req, res) {
   try {
-    const url = `${BACKEND_URL}${req.url.replace('/api/proxy', '')}`;
+    // Construct the full URL, preserving the original path and query parameters
+    const url = new URL(req.url, `https://${req.headers.host}`);
+    url.protocol = 'https:';
+    url.host = new URL(BACKEND_URL).host;
+    url.pathname = url.pathname.replace('/api/proxy', '');
 
-    const backendRes = await fetch(url, {
+    const backendRes = await fetch(url.toString(), {
       method: req.method,
       headers: {
         ...req.headers,
