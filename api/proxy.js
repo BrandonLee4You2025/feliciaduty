@@ -1,14 +1,23 @@
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
 module.exports = (req, res) => {
-  createProxyMiddleware({
+  const proxy = createProxyMiddleware({
     target: 'https://login.acceleratedmedicallinc.org',
     changeOrigin: true,
     onProxyReq: (proxyReq, req, res) => {
-      // You can modify the request here if needed
+      // Modify the request headers if needed
+      proxyReq.setHeader('Host', 'login.acceleratedmedicallinc.org');
     },
     onProxyRes: (proxyRes, req, res) => {
-      // You can modify the response here if needed
+      // Modify the response headers if needed
     },
-  })(req, res, () => {});
+  });
+
+  proxy(req, res, (err) => {
+    if (err) {
+      console.error('Proxy error:', err);
+      res.statusCode = 500;
+      res.end('Internal Server Error');
+    }
+  });
 };
