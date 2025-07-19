@@ -13,7 +13,9 @@ export default async function handler(req, res) {
         host: new URL(BACKEND_URL).host,
         'x-forwarded-for': req.headers['x-forwarded-for'] || req.socket.remoteAddress,
         'x-forwarded-proto': req.headers['x-forwarded-proto'] || req.socket.encrypted ? 'https' : 'http',
+        'Cookie': req.headers.cookie, // Forward cookies
       },
+      credentials: 'include', // Include credentials
       body: req.method !== 'GET' ? req.body : undefined,
     });
 
