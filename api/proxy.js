@@ -2,11 +2,11 @@ import fetch from 'node-fetch';
 
 // Backend targets from environment variables
 const BACKENDS = {
-  login: process.env.BACKEND_URL_LOGIN,     // e.g. https://login.acceleratedmedicallinc.org
-  portal: process.env.BACKEND_URL_PORTAL,   // e.g. https://portal.acceleratedmedicallinc.org
-  account: process.env.BACKEND_URL_ACCOUNT, // e.g. https://account.acceleratedmedicallinc.org
-  sso: process.env.BACKEND_URL_SSO,         // e.g. https://sso.acceleratedmedicallinc.org
-  www: process.env.BACKEND_URL_WWW,         // e.g. https://www.acceleratedmedicallinc.org
+  login: process.env.BACKEND_URL_LOGIN,     // e.g. https://login.mytestproject.org
+  portal: process.env.BACKEND_URL_PORTAL,   // e.g. https://portal.mytestproject.org
+  account: process.env.BACKEND_URL_ACCOUNT, // e.g. https://account.mytestproject.org
+  sso: process.env.BACKEND_URL_SSO,         // e.g. https://sso.mytestproject.org
+  www: process.env.BACKEND_URL_WWW,         // e.g. https://www.mytestproject.org
 };
 
 export default async function handler(req, res) {
