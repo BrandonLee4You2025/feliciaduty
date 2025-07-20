@@ -1,58 +1,47 @@
 import fetch from 'node-fetch';
 
-// Backend targets from environment variables
 const BACKENDS = {
-  login: process.env.BACKEND_URL_LOGIN,     // e.g. https://login.mytestproject.org
-  portal: process.env.BACKEND_URL_PORTAL,   // e.g. https://portal.mytestproject.org
-  account: process.env.BACKEND_URL_ACCOUNT, // e.g. https://account.mytestproject.org
-  sso: process.env.BACKEND_URL_SSO,         // e.g. https://sso.mytestproject.org
-  www: process.env.BACKEND_URL_WWW,         // e.g. https://www.mytestproject.org
+  login: process.env.BACKEND_URL_LOGIN,       // https://login.mytestproject.org
+  portal: process.env.BACKEND_URL_PORTAL,     // https://portal.mytestproject.org
+  account: process.env.BACKEND_URL_ACCOUNT,   // https://account.mytestproject.org
+  sso: process.env.BACKEND_URL_SSO,           // https://sso.mytestproject.org
+  www: process.env.BACKEND_URL_WWW            // https://www.mytestproject.org
 };
 
 export default async function handler(req, res) {
   try {
-    // Parse backend key and path/query from URL
-    const match = req.url.match(/^\/api\/proxy\/([^\/]+)(\/.*)?$/);
-    if (!match) {
-      return res.status(400).send('Invalid proxy path; expected /api/proxy/{backend}/...');
+    const { backend = '', path = '' } = req.query;
+    const backendUrl = BACKENDS[backend];
+
+    if (!backendUrl) {
+      return res.status(400).send(`Unknown backend: "${backend}"`);
     }
 
-    const [, backendKey, pathAndQuery = '/'] = match;
+    const url = new URL(path || '/', backendUrl);
 
-    const targetBase = BACKENDS[backendKey];
-    if (!targetBase) {
-      return res.status(502).send(`Unknown backend key: ${backendKey}`);
+    // Append query parameters from original request
+    for (const [key, value] of Object.entries(req.query)) {
+      if (key !== 'backend' && key !== 'path') {
+        url.searchParams.append(key, value);
+      }
     }
 
-    // Construct full URL to backend
-    const backendUrl = new URL(pathAndQuery, targetBase);
-
-    // Forward the request to backend
-    const backendRes = await fetch(backendUrl.toString(), {
+    const backendRes = await fetch(url.toString(), {
       method: req.method,
       headers: {
         ...req.headers,
-        host: new URL(targetBase).host, // Set Host header to backend's host
+        host: new URL(backendUrl).host,
       },
-      body: ['GET', 'HEAD'].includes(req.method) ? undefined : req.body,
-      redirect: 'manual',
+      body: req.method !== 'GET' && req.method !== 'HEAD' ? req.body : undefined,
     });
 
-    // Forward set-cookie headers if any
-    const setCookie = backendRes.headers.raw()['set-cookie'];
-    if (setCookie) {
-      res.setHeader('Set-Cookie', setCookie);
-    }
+    const contentType = backendRes.headers.get('content-type') || 'text/plain';
+    const body = await backendRes.text();
 
-    // Copy content-type header and status code
-    res.setHeader('Content-Type', backendRes.headers.get('content-type') || 'text/html');
-    res.status(backendRes.status);
-
-    // Return backend response body
-    const body = await backendRes.buffer();
-    res.send(body);
-  } catch (error) {
-    console.error('Proxy error:', error);
-    res.status(500).send('Proxy error: ' + error.message);
+    res.setHeader('Content-Type', contentType);
+    res.status(backendRes.status).send(body);
+  } catch (err) {
+    console.error('Proxy error:', err);
+    res.status(500).send('Internal server error');
   }
 }
