@@ -1,11 +1,9 @@
 {
-  "name": "vercel-proxy",
+  "name": "transconnectapp",
   "version": "1.0.0",
   "main": "index.js",
-  "scripts": {
-    "start": "node index.js"
-  },
+  "type": "module",
   "dependencies": {
-    "http-proxy-middleware": "^2.0.6"
+    "node-fetch": "^2.6.7"
   }
 }
