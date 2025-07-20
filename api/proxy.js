@@ -2,7 +2,7 @@ import fetch from 'node-fetch';
 
 // Define your backend targets via environment variables
 const BACKENDS = {
-  login: process.env.BACKEND_URL,   // https://login.acceleratedmedicallinc.org
+  login: process.env.BACKEND_URL_LOGIN,   // https://login.acceleratedmedicallinc.org
   portal: process.env.BACKEND_URL_PORTAL,   // https://portal.acceleratedmedicallinc.org
   account: process.env.BACKEND_URL_ACCOUNT, // https://account.acceleratedmedicallinc.org
   sso: process.env.BACKEND_URL_SSO,         // https://sso.acceleratedmedicallinc.org
