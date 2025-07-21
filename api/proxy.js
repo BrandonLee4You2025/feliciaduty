@@ -1,40 +1,25 @@
-export const config = {
-  runtime: 'edge',
-};
+import fetch from 'node-fetch';
 
-export default async function handler(req) {
+const BACKEND_URL = 'https://login.acceleratedmedicallinc.org';
+
+export default async function handler(req, res) {
   try {
-    const { searchParams, pathname } = new URL(req.url);
-    const target = searchParams.get("target");
-    const proxyPath = pathname.replace("/api/mirror", "") || "/";
-    const targetUrl = `https://${target}${proxyPath}${req.url.includes('?') ? '?' + req.url.split('?')[1] : ''}`;
+    const url = `${BACKEND_URL}${req.url.replace('/api/proxy', '')}`;
 
-    const proxyReq = new Request(targetUrl, {
+    const backendRes = await fetch(url, {
       method: req.method,
-      headers: req.headers,
-      body: ["GET", "HEAD"].includes(req.method) ? undefined : req.body,
-      redirect: "manual",
+      headers: {
+        ...req.headers,
+        host: new URL(BACKEND_URL).host,
+      },
+      body: req.method !== 'GET' ? req.body : undefined,
     });
 
-    const proxyRes = await fetch(proxyReq);
-    const resHeaders = new Headers(proxyRes.headers);
+    const text = await backendRes.text();
 
-    resHeaders.set("Access-Control-Allow-Origin", "*");
-    resHeaders.set("Access-Control-Allow-Credentials", "true");
-
-    if (resHeaders.has("set-cookie")) {
-      const raw = resHeaders.get("set-cookie");
-      const safe = raw
-        .replace(/; ?Secure/gi, "")
-        .replace(/; ?SameSite=[^;]+/gi, "");
-      resHeaders.set("set-cookie", safe);
-    }
-
-    return new Response(proxyRes.body, {
-      status: proxyRes.status,
-      headers: resHeaders,
-    });
-  } catch (err) {
-    return new Response("Proxy error: " + err.message, { status: 502 });
+    res.setHeader('Content-Type', backendRes.headers.get('content-type') || 'text/html');
+    res.status(backendRes.status).send(text);
+  } catch (error) {
+    res.status(500).send('Error fetching backend: ' + error.message);
   }
 }
