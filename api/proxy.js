@@ -33,15 +33,17 @@ export default async function handler(req) {
   let body = await response.text();
 
   if (contentType.includes("text/html")) {
-    // Rewrite links to go through our proxy
+    const base = `https://${req.headers.get("host")}`;
+
     body = body
+      // Rewrite relative href/src
       .replace(/(href|src)=["'](\/[^"']*)["']/g, (match, attr, url) => {
-        return `${attr}="/api/proxy?backend=${backend}&path=${encodeURIComponent(url)}"`;
+        return `${attr}="${base}/api/proxy?backend=${backend}&path=${encodeURIComponent(url)}"`;
       })
+      // Rewrite absolute links to acceleratedmedicallinc.org
       .replace(/(https:\/\/(?:\w+\.)?acceleratedmedicallinc\.org)(\/[^"'\s]*)/g, (match, full, url) => {
-        // Extract subdomain
         const sub = full.split("//")[1].split(".")[0];
-        return `/api/proxy?backend=${sub}&path=${encodeURIComponent(url)}`;
+        return `${base}/api/proxy?backend=${sub}&path=${encodeURIComponent(url)}`;
       });
   }
 
