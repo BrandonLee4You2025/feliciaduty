@@ -1,73 +1,64 @@
-const fetch = require("node-fetch");
-const cheerio = require("cheerio");
+import fetch from 'node-fetch';
 
 const BACKENDS = {
-  login: "https://login.acceleratedmedicallinc.org",
-  sso: "https://sso.acceleratedmedicallinc.org",
-  portal: "https://portal.acceleratedmedicallinc.org",
-  account: "https://account.acceleratedmedicallinc.org",
-  www: "https://www.acceleratedmedicallinc.org"
+  login: process.env.BACKEND_URL_LOGIN,
+  portal: process.env.BACKEND_URL_PORTAL,
+  account: process.env.BACKEND_URL_ACCOUNT,
+  sso: process.env.BACKEND_URL_SSO,
+  www: process.env.BACKEND_URL_WWW,
+};
+
+export const config = {
+  api: {
+    bodyParser: false, // Disable automatic body parsing by Vercel
+  },
 };
 
 export default async function handler(req, res) {
-  const { backend, path = "/", ...query } = req.query;
-
-  const base = BACKENDS[backend];
-  if (!base) {
-    return res.status(400).send("Invalid backend");
-  }
-
-  const fullUrl = `${base}${path}${Object.keys(query).length ? `?${new URLSearchParams(query)}` : ""}`;
-  console.log("Proxying to:", fullUrl);
-
   try {
-    const response = await fetch(fullUrl, {
+    const { backend = '', path = '' } = req.query;
+    const backendUrl = BACKENDS[backend];
+
+    if (!backendUrl) {
+      return res.status(400).send(`Unknown backend: "${backend}"`);
+    }
+
+    const url = new URL(path || '/', backendUrl);
+
+    // Append query parameters except backend and path
+    for (const [key, value] of Object.entries(req.query)) {
+      if (key !== 'backend' && key !== 'path') {
+        url.searchParams.append(key, value);
+      }
+    }
+
+    // Convert readable stream to Buffer
+    let body;
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      body = await new Promise((resolve, reject) => {
+        const chunks = [];
+        req.on('data', chunk => chunks.push(chunk));
+        req.on('end', () => resolve(Buffer.concat(chunks)));
+        req.on('error', reject);
+      });
+    }
+
+    const backendRes = await fetch(url.toString(), {
       method: req.method,
       headers: {
         ...req.headers,
-        host: new URL(base).host,
+        host: new URL(backendUrl).host,
       },
-      redirect: "manual",
+      body,
     });
 
-    const contentType = response.headers.get("content-type");
-    const body = await response.text();
+    const contentType = backendRes.headers.get('content-type') || 'text/plain';
+    const text = await backendRes.text();
 
-    // 🧠 If it's HTML, rewrite the links
-    if (contentType && contentType.includes("text/html")) {
-      const $ = cheerio.load(body);
-
-      // Rewrite all links and resources
-      $("[href], [src], [action]").each((_, el) => {
-        const $el = $(el);
-        const attr = $el.attr("href") ? "href" : $el.attr("src") ? "src" : "action";
-        const original = $el.attr(attr);
-        if (!original || original.startsWith("data:") || original.startsWith("javascript:")) return;
-
-        const parsed = new URL(original, base);
-        const matchedBackend = Object.entries(BACKENDS).find(([key, url]) =>
-          parsed.hostname.includes(new URL(url).hostname)
-        );
-
-        if (matchedBackend) {
-          const newBackend = matchedBackend[0];
-          const newPath = parsed.pathname;
-          const newQuery = parsed.searchParams.toString();
-          const rewritten = `/api/proxy?backend=${newBackend}&path=${newPath}${newQuery ? `&${newQuery}` : ""}`;
-          $el.attr(attr, rewritten);
-        }
-      });
-
-      res.setHeader("Content-Type", "text/html");
-      return res.send($.html());
-    }
-
-    // 🧠 Not HTML — just forward it as-is
-    res.status(response.status);
-    response.headers.forEach((v, k) => res.setHeader(k, v));
-    return res.send(body);
+    res.setHeader('Content-Type', contentType);
+    res.status(backendRes.status).send(text);
   } catch (err) {
-    console.error("Proxy error:", err);
-    res.status(500).send("Proxy failed.");
+    console.error('Proxy error:', err);
+    res.status(500).send('Internal server error');
   }
 }
