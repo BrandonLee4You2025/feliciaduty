@@ -1,64 +1,44 @@
-import fetch from 'node-fetch';
+import fetch from "node-fetch";
 
-const BACKENDS = {
-  login: process.env.BACKEND_URL_LOGIN,
-  portal: process.env.BACKEND_URL_PORTAL,
-  account: process.env.BACKEND_URL_ACCOUNT,
-  sso: process.env.BACKEND_URL_SSO,
-  www: process.env.BACKEND_URL_WWW,
-};
-
-export const config = {
-  api: {
-    bodyParser: false, // Disable automatic body parsing by Vercel
-  },
+const BACKEND_URLS = {
+  login: "https://login.acceleratedmedicallinc.org",
+  portal: "https://portal.acceleratedmedicallinc.org",
+  sso: "https://sso.acceleratedmedicallinc.org",
+  account: "https://account.acceleratedmedicallinc.org",
+  www: "https://www.acceleratedmedicallinc.org"
 };
 
 export default async function handler(req, res) {
+  const { backend, path = "" } = req.query;
+  const baseUrl = BACKEND_URLS[backend];
+
+  if (!baseUrl) {
+    return res.status(400).send("Invalid backend");
+  }
+
+  const fullUrl = `${baseUrl}${path.startsWith("/") ? path : "/" + path}`;
+
   try {
-    const { backend = '', path = '' } = req.query;
-    const backendUrl = BACKENDS[backend];
+    const response = await fetch(fullUrl);
+    let contentType = response.headers.get("content-type") || "";
 
-    if (!backendUrl) {
-      return res.status(400).send(`Unknown backend: "${backend}"`);
-    }
+    let body = await response.text();
 
-    const url = new URL(path || '/', backendUrl);
-
-    // Append query parameters except backend and path
-    for (const [key, value] of Object.entries(req.query)) {
-      if (key !== 'backend' && key !== 'path') {
-        url.searchParams.append(key, value);
-      }
-    }
-
-    // Convert readable stream to Buffer
-    let body;
-    if (req.method !== 'GET' && req.method !== 'HEAD') {
-      body = await new Promise((resolve, reject) => {
-        const chunks = [];
-        req.on('data', chunk => chunks.push(chunk));
-        req.on('end', () => resolve(Buffer.concat(chunks)));
-        req.on('error', reject);
+    // Rewrite internal links if content is HTML
+    if (contentType.includes("text/html")) {
+      body = body.replace(/(https?:\/\/)?([a-z]+)\.acceleratedmedicallinc\.org(\/[^\s"'<>]*)?/gi, (match, proto, sub, rest) => {
+        if (BACKEND_URLS[sub]) {
+          const cleanPath = encodeURIComponent(rest || "/");
+          return `/api/proxy?backend=${sub}&path=${cleanPath}`;
+        }
+        return match;
       });
     }
 
-    const backendRes = await fetch(url.toString(), {
-      method: req.method,
-      headers: {
-        ...req.headers,
-        host: new URL(backendUrl).host,
-      },
-      body,
-    });
-
-    const contentType = backendRes.headers.get('content-type') || 'text/plain';
-    const text = await backendRes.text();
-
-    res.setHeader('Content-Type', contentType);
-    res.status(backendRes.status).send(text);
+    res.setHeader("Content-Type", contentType);
+    res.status(response.status).send(body);
   } catch (err) {
-    console.error('Proxy error:', err);
-    res.status(500).send('Internal server error');
+    console.error("Proxy error:", err.message);
+    res.status(502).send("Proxy fetch failed");
   }
 }
