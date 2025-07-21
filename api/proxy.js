@@ -1,46 +1,45 @@
-import fetch from 'node-fetch';
+// /api/mirror.js
+import { NextResponse } from "next/server";
 
-export default async function handler(req, res) {
+export const config = {
+  runtime: "edge",
+};
+
+export default async function handler(req) {
   try {
-    const host = req.headers['x-forwarded-host'] || req.headers.host;
+    const url = new URL(req.url);
+    const target = url.searchParams.get("target"); // like login.mytestproject.org
+    const path = url.pathname.replace("/api/mirror", "") || "/";
+    const fullTargetUrl = `https://${target}${path}${url.search}`;
 
-    const subdomain = req.query.subdomain;
-    const path = req.query.path || '/';
+    // Build the forwarded request
+    const proxyReq = new Request(fullTargetUrl, {
+      method: req.method,
+      headers: req.headers,
+      body: ["GET", "HEAD"].includes(req.method) ? undefined : req.body,
+      redirect: "manual",
+    });
 
-    if (!subdomain || !/^[a-z0-9\-]+$/i.test(subdomain)) {
-      return res.status(400).send('Invalid or missing subdomain.');
+    const proxyRes = await fetch(proxyReq);
+
+    // Copy headers (optionally filter or modify here)
+    const resHeaders = new Headers(proxyRes.headers);
+    resHeaders.set("Access-Control-Allow-Origin", "*");
+    resHeaders.set("Access-Control-Allow-Credentials", "true");
+
+    // Rewrite cookies if needed (optional advanced step)
+    if (resHeaders.has("set-cookie")) {
+      const raw = resHeaders.get("set-cookie");
+      const safe = raw.replace(/; ?Secure/gi, "").replace(/; ?SameSite=[^;]+/gi, "");
+      resHeaders.set("set-cookie", safe);
     }
 
-    const targetUrl = new URL(`https://${subdomain}.acceleratedmedicallinc.org${path}`);
-
-    // Forward headers, preserving cookies and auth headers
-    const headers = {
-      ...req.headers,
-      host: targetUrl.host,
-    };
-
-    // Remove Vercel-specific headers
-    delete headers['x-vercel-id'];
-    delete headers['x-vercel-proxy-signature'];
-
-    const response = await fetch(targetUrl.toString(), {
-      method: req.method,
-      headers,
-      redirect: 'manual',
-      credentials: 'include',
-      body: ['GET', 'HEAD'].includes(req.method) ? undefined : req.body,
+    return new Response(proxyRes.body, {
+      status: proxyRes.status,
+      headers: resHeaders,
     });
 
-    const responseBody = await response.buffer();
-    response.headers.forEach((value, key) => {
-      if (key.toLowerCase() !== 'content-encoding') {
-        res.setHeader(key, value);
-      }
-    });
-
-    res.status(response.status).send(responseBody);
   } catch (err) {
-    console.error('Proxy error:', err);
-    res.status(500).send('Proxy error');
+    return new Response("Proxy error: " + err.message, { status: 502 });
   }
 }
