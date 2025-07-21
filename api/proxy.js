@@ -1,44 +1,54 @@
 import fetch from "node-fetch";
 
-const BACKEND_URLS = {
+export const config = {
+  runtime: "edge",
+};
+
+const BACKENDS = {
   login: "https://login.acceleratedmedicallinc.org",
   portal: "https://portal.acceleratedmedicallinc.org",
   sso: "https://sso.acceleratedmedicallinc.org",
   account: "https://account.acceleratedmedicallinc.org",
-  www: "https://www.acceleratedmedicallinc.org"
+  www: "https://www.acceleratedmedicallinc.org",
 };
 
-export default async function handler(req, res) {
-  const { backend, path = "" } = req.query;
-  const baseUrl = BACKEND_URLS[backend];
+export default async function handler(req) {
+  const { searchParams } = new URL(req.url);
+  const backend = searchParams.get("backend");
+  const path = searchParams.get("path") || "/";
 
-  if (!baseUrl) {
-    return res.status(400).send("Invalid backend");
+  const target = BACKENDS[backend];
+  if (!target) {
+    return new Response("Invalid backend", { status: 400 });
   }
 
-  const fullUrl = `${baseUrl}${path.startsWith("/") ? path : "/" + path}`;
+  const targetUrl = `${target}${path.startsWith("/") ? path : "/" + path}`;
+  const response = await fetch(targetUrl, {
+    headers: {
+      "User-Agent": req.headers.get("user-agent"),
+    },
+  });
 
-  try {
-    const response = await fetch(fullUrl);
-    let contentType = response.headers.get("content-type") || "";
+  const contentType = response.headers.get("content-type") || "";
+  let body = await response.text();
 
-    let body = await response.text();
-
-    // Rewrite internal links if content is HTML
-    if (contentType.includes("text/html")) {
-      body = body.replace(/(https?:\/\/)?([a-z]+)\.acceleratedmedicallinc\.org(\/[^\s"'<>]*)?/gi, (match, proto, sub, rest) => {
-        if (BACKEND_URLS[sub]) {
-          const cleanPath = encodeURIComponent(rest || "/");
-          return `/api/proxy?backend=${sub}&path=${cleanPath}`;
-        }
-        return match;
+  if (contentType.includes("text/html")) {
+    // Rewrite links to go through our proxy
+    body = body
+      .replace(/(href|src)=["'](\/[^"']*)["']/g, (match, attr, url) => {
+        return `${attr}="/api/proxy?backend=${backend}&path=${encodeURIComponent(url)}"`;
+      })
+      .replace(/(https:\/\/(?:\w+\.)?acceleratedmedicallinc\.org)(\/[^"'\s]*)/g, (match, full, url) => {
+        // Extract subdomain
+        const sub = full.split("//")[1].split(".")[0];
+        return `/api/proxy?backend=${sub}&path=${encodeURIComponent(url)}`;
       });
-    }
-
-    res.setHeader("Content-Type", contentType);
-    res.status(response.status).send(body);
-  } catch (err) {
-    console.error("Proxy error:", err.message);
-    res.status(502).send("Proxy fetch failed");
   }
+
+  return new Response(body, {
+    status: response.status,
+    headers: {
+      "Content-Type": contentType,
+    },
+  });
 }
