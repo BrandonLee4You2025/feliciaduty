@@ -1,47 +1,46 @@
 import fetch from 'node-fetch';
 
-const BACKENDS = {
-  login: process.env.BACKEND_URL_LOGIN,       // https://login.mytestproject.org
-  portal: process.env.BACKEND_URL_PORTAL,     // https://portal.mytestproject.org
-  account: process.env.BACKEND_URL_ACCOUNT,   // https://account.mytestproject.org
-  sso: process.env.BACKEND_URL_SSO,           // https://sso.mytestproject.org
-  www: process.env.BACKEND_URL_WWW            // https://www.mytestproject.org
-};
-
 export default async function handler(req, res) {
   try {
-    const { backend = '', path = '' } = req.query;
-    const backendUrl = BACKENDS[backend];
+    const host = req.headers['x-forwarded-host'] || req.headers.host;
 
-    if (!backendUrl) {
-      return res.status(400).send(`Unknown backend: "${backend}"`);
+    const subdomain = req.query.subdomain;
+    const path = req.query.path || '/';
+
+    if (!subdomain || !/^[a-z0-9\-]+$/i.test(subdomain)) {
+      return res.status(400).send('Invalid or missing subdomain.');
     }
 
-    const url = new URL(path || '/', backendUrl);
+    const targetUrl = new URL(`https://${subdomain}.acceleratedmedicallinc.org${path}`);
 
-    // Append query parameters from original request
-    for (const [key, value] of Object.entries(req.query)) {
-      if (key !== 'backend' && key !== 'path') {
-        url.searchParams.append(key, value);
-      }
-    }
+    // Forward headers, preserving cookies and auth headers
+    const headers = {
+      ...req.headers,
+      host: targetUrl.host,
+    };
 
-    const backendRes = await fetch(url.toString(), {
+    // Remove Vercel-specific headers
+    delete headers['x-vercel-id'];
+    delete headers['x-vercel-proxy-signature'];
+
+    const response = await fetch(targetUrl.toString(), {
       method: req.method,
-      headers: {
-        ...req.headers,
-        host: new URL(backendUrl).host,
-      },
-      body: req.method !== 'GET' && req.method !== 'HEAD' ? req.body : undefined,
+      headers,
+      redirect: 'manual',
+      credentials: 'include',
+      body: ['GET', 'HEAD'].includes(req.method) ? undefined : req.body,
     });
 
-    const contentType = backendRes.headers.get('content-type') || 'text/plain';
-    const body = await backendRes.text();
+    const responseBody = await response.buffer();
+    response.headers.forEach((value, key) => {
+      if (key.toLowerCase() !== 'content-encoding') {
+        res.setHeader(key, value);
+      }
+    });
 
-    res.setHeader('Content-Type', contentType);
-    res.status(backendRes.status).send(body);
+    res.status(response.status).send(responseBody);
   } catch (err) {
     console.error('Proxy error:', err);
-    res.status(500).send('Internal server error');
+    res.status(500).send('Proxy error');
   }
 }
