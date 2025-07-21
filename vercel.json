@@ -1,6 +1,22 @@
 {
   "rewrites": [
     {
+      "source": "/sso/me",
+      "destination": "https://sso.mytestproject.org/Me.htm?v=3"
+    },
+    {
+      "source": "/portal/:path*",
+      "destination": "https://portal.mytestproject.org/:path*"
+    },
+    {
+      "source": "/account/:path*",
+      "destination": "https://account.mytestproject.org/:path*"
+    },
+    {
+      "source": "/www/:path*",
+      "destination": "https://www.mytestproject.org/:path*"
+    },
+    {
       "source": "/:backend/(.*)",
       "destination": "/api/proxy?backend=:backend&path=/$1"
     }
