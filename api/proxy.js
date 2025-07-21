@@ -36,19 +36,14 @@ export default async function handler(req) {
     const base = `https://${req.headers.get("host")}`;
 
     body = body
-      // Rewrite relative href/src like /foo/bar
+      // Rewrite relative href/src
       .replace(/(href|src)=["'](\/[^"']*)["']/g, (match, attr, url) => {
         return `${attr}="${base}/api/proxy?backend=${backend}&path=${encodeURIComponent(url)}"`;
       })
-
-      // Rewrite absolute URLs with protocol: https://sso.acceleratedmedicallinc.org/path
-      .replace(/(["'(\s])https:\/\/(\w+)\.acceleratedmedicallinc\.org(\/[^"')\s]*)/g, (_, prefix, sub, url) => {
-        return `${prefix}${base}/api/proxy?backend=${sub}&path=${encodeURIComponent(url)}`;
-      })
-
-      // Rewrite protocol-relative URLs: //sso.acceleratedmedicallinc.org/path
-      .replace(/(["'(\s])\/\/(\w+)\.acceleratedmedicallinc\.org(\/[^"')\s]*)/g, (_, prefix, sub, url) => {
-        return `${prefix}${base}/api/proxy?backend=${sub}&path=${encodeURIComponent(url)}`;
+      // Rewrite absolute links to acceleratedmedicallinc.org
+      .replace(/(https:\/\/(?:\w+\.)?acceleratedmedicallinc\.org)(\/[^"'\s]*)/g, (match, full, url) => {
+        const sub = full.split("//")[1].split(".")[0];
+        return `${base}/api/proxy?backend=${sub}&path=${encodeURIComponent(url)}`;
       });
   }
 
